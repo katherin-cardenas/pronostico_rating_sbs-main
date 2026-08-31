@@ -240,3 +240,54 @@ df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
 
 print(f"Reporte exportado a {output_path} | MAE Global: {mean_absolute_error(y, preds):.2f}\n")
 print(df_out.sample(min(10, len(df_out))).to_string(index=False))
+
+# =====================================================================
+# NUEVO APORTE: PROYECCIÓN A FUTURO (OUT-OF-SAMPLE PREDICTION)
+# =====================================================================
+print("\n" + "="*50)
+print("INICIANDO PROYECCIÓN PARA EL PRÓXIMO BOLETÍN SBS")
+print("="*50)
+
+# 1. Identificar el periodo más reciente de los indicadores financieros
+# Asumimos que los datos más recientes en df_ind_pivot son el "presente"
+periodos_disponibles = df_ind_pivot["periodo_clean"].sort_values().unique()
+ultimo_periodo_ind = periodos_disponibles[-1] 
+print(f"-> Usando indicadores financieros del periodo: {ultimo_periodo_ind}")
+
+# 2. Filtrar las entidades en ese último periodo (donde aún no hay rating oficial)
+df_futuro = df_ind_pivot[df_ind_pivot["periodo_clean"] == ultimo_periodo_ind].copy()
+
+# 3. Preparar la matriz X_futuro con las mismas features (las 20 seleccionadas)
+# Si hay datos nulos en este mes, los rellenamos con la media histórica calculada en df_valid
+for col in selected_features:
+    if col in df_futuro.columns:
+        df_futuro[col] = df_futuro[col].fillna(df_valid[col].mean())
+    else:
+        df_futuro[col] = 0  # Prevención por si una columna falta por completo
+
+X_futuro = df_futuro[selected_features].values
+
+# 4. Estandarizar usando el scaler ya entrenado con el pasado
+X_futuro_scaled = scaler.transform(X_futuro)
+
+# 5. Ejecutar la Red Neuronal para predecir el rating futuro
+preds_futuro = np.clip(model.predict(X_futuro_scaled).flatten(), 0, 12)
+
+# 6. Estructurar el reporte de proyección
+df_prediccion_final = pd.DataFrame({
+    "Entidad": df_futuro["entidad_clean"].values,
+    "Periodo Indicadores": df_futuro["periodo_clean"].values,
+    "Proyección septiembre 2026 (Num)": np.round(preds_futuro, 2),
+    "Proyección SBS (Letra)": [to_rating_label(v) for v in preds_futuro]
+})
+
+# Ordenamos alfabéticamente para mejor presentación
+df_prediccion_final = df_prediccion_final.sort_values(by="Entidad")
+
+# 7. Mostrar y exportar
+print("\n--- PREDICCIÓN PARA LA PRÓXIMA PUBLICACIÓN DE LA SBS ---")
+print(df_prediccion_final.to_string(index=False))
+
+output_futuro = "proyeccion_futura_sbs.csv"
+df_prediccion_final.to_csv(output_futuro, index=False, encoding="utf-8-sig")
+print(f"\n¡Proyección exitosa! Archivo guardado en: {output_futuro}")
