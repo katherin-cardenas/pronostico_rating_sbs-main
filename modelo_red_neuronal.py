@@ -241,9 +241,9 @@ df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
 print(f"Reporte exportado a {output_path} | MAE Global: {mean_absolute_error(y, preds):.2f}\n")
 print(df_out.sample(min(10, len(df_out))).to_string(index=False))
 
-# =====================================================================
-# NUEVO APORTE: PROYECCIÓN A FUTURO (OUT-OF-SAMPLE PREDICTION)
-# =====================================================================
+
+# PROYECCIÓN A FUTURO (OUT-OF-SAMPLE PREDICTION)
+
 print("\n" + "="*50)
 print("INICIANDO PROYECCIÓN PARA EL PRÓXIMO BOLETÍN SBS")
 print("="*50)
