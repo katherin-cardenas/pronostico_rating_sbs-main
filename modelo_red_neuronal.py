@@ -8,7 +8,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# --- Nuevas importaciones para exportar a Excel con formato ---
+# ---  Para exportar a Excel con formato ---
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
 from openpyxl.utils.dataframe import dataframe_to_rows
@@ -216,9 +216,8 @@ plt.legend()
 plt.tight_layout()
 plt.savefig("curva_entrenamiento.png", dpi=150)
 
-# =========================================================================
-# FUNCIÓN REUTILIZABLE PARA EXPORTAR EXCEL CON COLORES
-# =========================================================================
+# FUNCIÓN PARA EXPORTAR EXCEL 
+
 def exportar_excel_con_estilos(df, output_path, sheet_title, letter_col_indices):
     wb = Workbook()
     ws = wb.active
@@ -262,9 +261,9 @@ def exportar_excel_con_estilos(df, output_path, sheet_title, letter_col_indices)
     wb.save(output_path)
 
 
-# =========================================================================
+
 # EXPORTACIÓN 1: REPORTE HISTÓRICO (BACKTESTING)
-# =========================================================================
+
 RATING_MAP = {
     12: "AAA", 11: "AA+", 10: "AA", 9: "AA-", 8: "A+", 7: "A", 6: "A-",
     5: "BBB+", 4: "BBB", 3: "BB", 2: "B", 1: "C", 0: "D"
@@ -293,9 +292,9 @@ exportar_excel_con_estilos(df_out, output_path_hist, "Backtesting", [4, 5])
 print(f"Reporte exportado a {output_path_hist} | MAE Global: {mean_absolute_error(y, preds):.2f}\n")
 
 
-# =========================================================================
+
 # EXPORTACIÓN 2: PROYECCIÓN A FUTURO (OUT-OF-SAMPLE)
-# =========================================================================
+
 print("\n" + "="*50)
 print("INICIANDO PROYECCIÓN PARA EL PRÓXIMO BOLETÍN SBS")
 print("="*50)
@@ -333,3 +332,6 @@ exportar_excel_con_estilos(df_prediccion_final, output_futuro, "Proyección", [3
 print("\n--- PREDICCIÓN PARA LA PRÓXIMA PUBLICACIÓN DE LA SBS ---")
 print(df_prediccion_final.to_string(index=False))
 print(f"\n¡Proyección exitosa! Archivo guardado en: {output_futuro}")
+
+
+
