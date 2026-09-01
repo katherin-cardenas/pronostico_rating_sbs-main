@@ -8,6 +8,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+# --- Nuevas importaciones para exportar a Excel con formato ---
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
+# -----------------------------------------------------------
+
 from sklearn.metrics import mean_absolute_error
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -210,19 +216,64 @@ plt.legend()
 plt.tight_layout()
 plt.savefig("curva_entrenamiento.png", dpi=150)
 
-# Mapeo y exportación
+# =========================================================================
+# FUNCIÓN REUTILIZABLE PARA EXPORTAR EXCEL CON COLORES
+# =========================================================================
+def exportar_excel_con_estilos(df, output_path, sheet_title, letter_col_indices):
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet_title
+
+    for r in dataframe_to_rows(df, index=False, header=True):
+        ws.append(r)
+
+    header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+    header_font = Font(name="Calibri", size=12, bold=True, color="FFFFFF")
+    center_align = Alignment(horizontal="center", vertical="center")
+    left_align = Alignment(horizontal="left", vertical="center")
+    border = Border(left=Side(style='thin', color='D9D9D9'), right=Side(style='thin', color='D9D9D9'), 
+                    top=Side(style='thin', color='D9D9D9'), bottom=Side(style='thin', color='D9D9D9'))
+
+    color_map = {"AAA": "C6EFCE", "AA": "C6EFCE", "AA-": "E2EFDA", "A+": "FFF2CC", "A": "FFE699", "A-": "FCE4D6"}
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=1, max_row=ws.max_row), 1):
+        for col_idx, cell in enumerate(row):
+            cell.border = border
+            if row_idx == 1:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center_align
+            else:
+                cell.alignment = left_align if col_idx == 0 else center_align
+                if col_idx in letter_col_indices:
+                    val = cell.value
+                    bg_color = color_map.get(str(val), "FFFFFF")
+                    cell.fill = PatternFill(start_color=bg_color, end_color=bg_color, fill_type="solid")
+                    cell.font = Font(name="Calibri", bold=True, color="000000")
+
+    ws.column_dimensions['A'].width = 45
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 25
+    if ws.max_column >= 5: ws.column_dimensions['E'].width = 20
+    if ws.max_column >= 6: ws.column_dimensions['F'].width = 20
+
+    ws.freeze_panes = 'A2'
+    wb.save(output_path)
+
+
+# =========================================================================
+# EXPORTACIÓN 1: REPORTE HISTÓRICO (BACKTESTING)
+# =========================================================================
 RATING_MAP = {
     12: "AAA", 11: "AA+", 10: "AA", 9: "AA-", 8: "A+", 7: "A", 6: "A-",
     5: "BBB+", 4: "BBB", 3: "BB", 2: "B", 1: "C", 0: "D"
 }
 
-
 def to_rating_label(val):
-    if pd.isna(val):
-        return "N/A"
+    if pd.isna(val): return "N/A"
     idx = int(np.clip(round(val), 0, 12))
     return RATING_MAP.get(idx, "N/A")
-
 
 preds = np.clip(model.predict(scaler.transform(X)).flatten(), 0, 12)
 
@@ -235,45 +286,37 @@ df_out = pd.DataFrame({
     "Rating Predicho": [to_rating_label(v) for v in preds]
 })
 
-output_path = "predicciones_reporte_completo.csv"
-df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
+output_path_hist = "predicciones_reporte_completo.xlsx"
+# Pasamos [4, 5] porque son los índices de las columnas "Rating Real" y "Rating Predicho"
+exportar_excel_con_estilos(df_out, output_path_hist, "Backtesting", [4, 5])
 
-print(f"Reporte exportado a {output_path} | MAE Global: {mean_absolute_error(y, preds):.2f}\n")
-print(df_out.sample(min(10, len(df_out))).to_string(index=False))
+print(f"Reporte exportado a {output_path_hist} | MAE Global: {mean_absolute_error(y, preds):.2f}\n")
 
 
-# PROYECCIÓN A FUTURO (OUT-OF-SAMPLE PREDICTION)
-
+# =========================================================================
+# EXPORTACIÓN 2: PROYECCIÓN A FUTURO (OUT-OF-SAMPLE)
+# =========================================================================
 print("\n" + "="*50)
 print("INICIANDO PROYECCIÓN PARA EL PRÓXIMO BOLETÍN SBS")
 print("="*50)
 
-# 1. Identificar el periodo más reciente de los indicadores financieros
-# Asumimos que los datos más recientes en df_ind_pivot son el "presente"
 periodos_disponibles = df_ind_pivot["periodo_clean"].sort_values().unique()
 ultimo_periodo_ind = periodos_disponibles[-1] 
 print(f"-> Usando indicadores financieros del periodo: {ultimo_periodo_ind}")
 
-# 2. Filtrar las entidades en ese último periodo (donde aún no hay rating oficial)
 df_futuro = df_ind_pivot[df_ind_pivot["periodo_clean"] == ultimo_periodo_ind].copy()
 
-# 3. Preparar la matriz X_futuro con las mismas features (las 20 seleccionadas)
-# Si hay datos nulos en este mes, los rellenamos con la media histórica calculada en df_valid
 for col in selected_features:
     if col in df_futuro.columns:
         df_futuro[col] = df_futuro[col].fillna(df_valid[col].mean())
     else:
-        df_futuro[col] = 0  # Prevención por si una columna falta por completo
+        df_futuro[col] = 0  
 
 X_futuro = df_futuro[selected_features].values
-
-# 4. Estandarizar usando el scaler ya entrenado con el pasado
 X_futuro_scaled = scaler.transform(X_futuro)
 
-# 5. Ejecutar la Red Neuronal para predecir el rating futuro
 preds_futuro = np.clip(model.predict(X_futuro_scaled).flatten(), 0, 12)
 
-# 6. Estructurar el reporte de proyección
 df_prediccion_final = pd.DataFrame({
     "Entidad": df_futuro["entidad_clean"].values,
     "Periodo Indicadores": df_futuro["periodo_clean"].values,
@@ -281,13 +324,12 @@ df_prediccion_final = pd.DataFrame({
     "Proyección SBS (Letra)": [to_rating_label(v) for v in preds_futuro]
 })
 
-# Ordenamos alfabéticamente para mejor presentación
 df_prediccion_final = df_prediccion_final.sort_values(by="Entidad")
 
-# 7. Mostrar y exportar
+output_futuro = "proyeccion_futura_sbs.xlsx"
+# Pasamos [3] porque es el índice de la columna "Proyección SBS (Letra)"
+exportar_excel_con_estilos(df_prediccion_final, output_futuro, "Proyección", [3])
+
 print("\n--- PREDICCIÓN PARA LA PRÓXIMA PUBLICACIÓN DE LA SBS ---")
 print(df_prediccion_final.to_string(index=False))
-
-output_futuro = "proyeccion_futura_sbs.csv"
-df_prediccion_final.to_csv(output_futuro, index=False, encoding="utf-8-sig")
 print(f"\n¡Proyección exitosa! Archivo guardado en: {output_futuro}")
