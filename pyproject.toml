@@ -1,0 +1,21 @@
+[project]
+name = "pronostico-rating-sbs-main"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Andre-Carrillo", email = "carrillomonteroandre@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "altair>=6.3.0",
+    "streamlit>=1.64.0",
+    "xlsxwriter>=3.2.9",
+]
+
+[project.scripts]
+pronostico-rating-sbs-main = "pronostico_rating_sbs_main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.10,<0.13.0"]
+build-backend = "uv_build"
